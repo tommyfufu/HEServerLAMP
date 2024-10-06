@@ -1,15 +1,22 @@
-version: "4"
+version: "3.8"
 
 services:
-  #goapp:
-  # build:
-  #   context: ./www/api/v1/web/go-crud/ 
-  #   dockerfile: ./bin/golang/
-  # container_name: "${COMPOSE_PROJECT_NAME}-goapp"
-  # ports:
-  #   - "8080:8080"
-  # depends_on:
-  #   - mongodb
+  goapp:
+    build:
+      context: .
+      dockerfile: ./bin/golang/Dockerfile
+    container_name: "${COMPOSE_PROJECT_NAME}-goapp"
+    ports:
+      - "8090:8090"
+    environment:
+      MONGO_ADDR: ${MONGODB_ADDR}
+      MONGO_USER: ${MONGODB_USER}
+      MONGO_PASS: ${MONGODB_PASSWORD}
+      MONGO_DATABASE: ${MONGODB_DATABASE}
+      SERVER_ADDR: ${SERVER_ADDR}
+    depends_on:
+      - mongodb
+
   mongodb:
     image: mongo:latest
     container_name: "${COMPOSE_PROJECT_NAME}-mongodb"
@@ -18,12 +25,10 @@ services:
     volumes:
       - mongodb-data:/data/db
     environment:
-      MONGO_ADDR: ${HE_SERVER_IP}
       MONGO_INITDB_ROOT_USERNAME: ${MONGODB_USER}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD}
-      MONGO_USER: ${MONGODB_USER}
-      MONGO_PASSWORD: ${MONGODB_PASSWORD}
       MONGO_DATABASE: ${MONGODB_DATABASE}
+
   webserver:
     build:
       context: ./bin/${PHPVERSION}
@@ -32,8 +37,6 @@ services:
     ports:
       - "${HOST_MACHINE_UNSECURE_HOST_PORT}:80"
       - "${HOST_MACHINE_SECURE_HOST_PORT}:443"
-    links:
-      - database
     volumes:
       - ${DOCUMENT_ROOT-./www}:/var/www/html:rw
       - ${PHP_INI-./config/php/php.ini}:/usr/local/etc/php/php.ini
@@ -45,11 +48,6 @@ services:
     environment:
       APACHE_DOCUMENT_ROOT: ${APACHE_DOCUMENT_ROOT-/var/www/html}
       PMA_PORT: ${HOST_MACHINE_PMA_PORT}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      HOST_MACHINE_MYSQL_PORT: ${HOST_MACHINE_MYSQL_PORT}
       XDEBUG_CONFIG: "client_host=host.docker.internal remote_port=${XDEBUG_PORT}"
       TZ: Asia/Taipei
       ASUS_API_ID: ${ASUS_API_ID}
@@ -58,30 +56,17 @@ services:
       ASUS_AUTH_TOKEN: ${ASUS_AUTH_TOKEN}
     extra_hosts:
       - "host.docker.internal:host-gateway"
-  database:
+  
+  heweb:
     build:
-      context: "./bin/${DATABASE}"
-    container_name: "${COMPOSE_PROJECT_NAME}-${DATABASE}"
-    restart: "always"
+      context: ./bin/heweb
+    container_name: "${COMPOSE_PROJECT_NAME}-heweb"
     ports:
-      - "${HOST_MACHINE_MYSQL_PORT}:3306"
+      - "4200:80"
     volumes:
-      - ${MYSQL_INITDB_DIR-./config/initdb}:/docker-entrypoint-initdb.d
-      - ${MYSQL_DATA_DIR-./data/mysql}:/var/lib/mysql
-      - ${MYSQL_LOG_DIR-./logs/mysql}:/var/log/mysql
-    environment:
-      MYSQL_ADDR: ${HE_SERVER_IP}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      TZ: Asia/Taipei
-    command: ['mysqld', '--character-set-server=utf8mb4', '--collation-server=utf8mb4_unicode_ci']
-  redis:
-    container_name: "${COMPOSE_PROJECT_NAME}-redis"
-    image: redis:latest
-    ports:
-      - "127.0.0.1:${HOST_MACHINE_REDIS_PORT}:6379"
+      - ./bin/heweb/heweb-app/browser:/usr/share/nginx/html:ro
+    depends_on:
+      - goapp
+
 volumes:
   mongodb-data:
-  mysql-data:
